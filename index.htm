@@ -4,7 +4,7 @@
 <head>
 <meta http-equiv="Content-Language" content="en-us" />
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-<title>test page</title>
+<title>極度簡陋遊戲下載測試頁面</title>
 <style type="text/css">
 
 
@@ -14,10 +14,11 @@ body {
 }
 
 .topnav {
-	position: fixed;
   overflow: hidden;
   background-color: #333;
-}
+  position: fixed; /* Set the navbar to fixed position */
+  top: 0; /* Position the navbar at the top of the page */
+  width: 100%; /* Full width */}
 
 .topnav a {
   float: left;
@@ -41,8 +42,10 @@ body {
 
 
 table.game {
-  table-layout:auto;
- max-width: 80%;  
+ 	table-layout:auto;
+ 	max-width: 80%; 
+    margin-left: auto;
+    margin-right: auto; 
 }
 
 .style3 {
@@ -67,23 +70,26 @@ table.game {
   <a href="#bottom">c</a>
 </div>
 
-<div style="padding-left:16px">
-  <h2>This is a test page for downloading files</h2>
-  <p>click the image or game name to download !!! </p>
+
+<div>
+
+  <p class="style4">撳圖片下載</p>
+  <p class="style4">撳圖片下載</p>
+  <p class="style4">咩功能都冇</p>
 </div>
 
 <table class="game">
 	<tr id="top" >
-		<td class="style3">&nbsp;<img  src="src/image/1.png"/> <br /> 1.fds</td>
-		<td class="style3">&nbsp;<img  src="src/image/2.png"/> <br /> 2.fds</td>
-		<td class="style3">&nbsp;<img  src="src/image/3.png"/> <br /> 3.fds</td>
-		<td class="style3">&nbsp;<img  src="src/image/4.png"/> <br /> 4.fds</td>
+		<td class="style3">&nbsp;<a href="src/rom/1.fds"><img  src="src/image/1.png"/></a> <br /> 1.fds</td>
+		<td class="style3">&nbsp;<a href="src/rom/2.fds"><img  src="src/image/2.png"/></a> <br /> 2.fds</td>
+		<td class="style3">&nbsp;<a href="src/rom/3.fds"><img  src="src/image/3.png"/></a> <br /> 3.fds</td>
+		<td class="style3">&nbsp;<a href="src/rom/4.fds"><img  src="src/image/4.png"/></a> <br /> 4.fds</td>
 	</tr>
 	<tr id="middle">
-		<td class="style3">&nbsp;<img  src="src/image/5.png"/> <br /> 5.fds</td>
-		<td class="style3">&nbsp;<img  src="src/image/6.png"/> <br /> 6.fds</td>
-		<td class="style3">&nbsp;<img  src="src/image/7.png"/> <br /> 7.fds</td>
-		<td class="style3">&nbsp;<img  src="src/image/8.png"/> <br /> 8.fds</td>
+		<td class="style3">&nbsp;<a href="src/rom/5.fds"><img  src="src/image/5.png"/></a> <br /> 5.fds</td>
+		<td class="style3">&nbsp;<a href="src/rom/6.fds"><img  src="src/image/6.png"/></a> <br /> 6.fds</td>
+		<td class="style3">&nbsp;<a href="src/rom/7.fds"><img  src="src/image/7.png"/></a> <br /> 7.fds</td>
+		<td class="style3">&nbsp;<a href="src/rom/8.fds"><img  src="src/image/8.png"/></a> <br /> 8.fds</td>
 
 	</tr>	
 	
