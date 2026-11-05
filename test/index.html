@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N64 Spinning Logo GIF Generator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js for 3D Rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- GIFEncoder / CanvasCapture helper -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.3.2/gifshot.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@600;700&display=swap');
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+        }
+        .arcade-font {
+            font-family: 'Press Start 2P', monospace;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-4 md:p-8">
+
+    <!-- Header -->
+    <header class="text-center mb-6">
+        <h1 class="arcade-font text-xl md:text-2xl text-red-500 mb-2 drop-shadow-[0_2px_10px_rgba(239,68,68,0.5)]">N64 LOGO GENERATOR</h1>
+        <p class="text-gray-400 text-sm">經典 N64 旋轉標誌與自訂 GIF 產生器</p>
+    </header>
+
+    <!-- Main Container -->
+    <main class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-900/80 border border-gray-800 p-6 rounded-2xl shadow-2xl backdrop-blur-md">
+        
+        <!-- Canvas / Preview Area -->
+        <div class="flex flex-col items-center justify-center bg-black/60 rounded-xl border border-gray-800 p-4 relative overflow-hidden min-h-[320px]">
+            <div id="canvas-container" class="w-full h-[300px] flex items-center justify-center"></div>
+            <div id="progress-container" class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center hidden">
+                <div class="w-3/4 bg-gray-700 rounded-full h-4 mb-3 overflow-hidden border border-gray-600">
+                    <div id="progress-bar" class="bg-red-500 h-full w-0 transition-all duration-75"></div>
+                </div>
+                <p id="progress-text" class="arcade-font text-xs text-yellow-400">正在擷取影格 (0/30)...</p>
+            </div>
+        </div>
+
+        <!-- Controls Area -->
+        <div class="flex flex-col justify-between space-y-4">
+            <div class="space-y-4">
+                <!-- Text Input -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-300 mb-1">標誌/文字內容</label>
+                    <input type="text" id="logo-text" value="MARIO KART" maxlength="12" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-red-500 font-bold uppercase tracking-wider">
+                </div>
+
+                <!-- Color Pickers -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">標誌框顏色</label>
+                        <input type="color" id="color-box" value="#e53e3e" class="w-full h-10 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">文字/立體顏色</label>
+                        <input type="color" id="color-text" value="#ffffff" class="w-full h-10 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">背景顏色</label>
+                        <input type="color" id="color-bg" value="#0b0f19" class="w-full h-10 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">旋轉速度</label>
+                        <select id="speed-select" class="w-full h-10 bg-gray-800 border border-gray-700 text-white rounded-lg px-2 text-sm focus:outline-none focus:border-red-500">
+                            <option value="1">正常 (Normal)</option>
+                            <option value="2">快速 (Fast)</option>
+                            <option value="0.5">慢速 (Slow)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Button -->
+            <button id="export-btn" class="w-full bg-red-600 hover:bg-red-500 text-white arcade-font py-3 px-4 rounded-xl shadow-lg transition-transform active:scale-95 text-xs tracking-widest flex items-center justify-center space-x-2">
+                <span>📦 匯出 360° GIF</span>
+            </button>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-6 text-center text-xs text-gray-500">
+        N64 Retro Fan Project &bull; Built with Three.js & HTML5 Canvas
+    ></footer>
+
+    <!-- Logic Script -->
+    <script>
+        // Three.js Scene Setup
+        const container = document.getElementById('canvas-container');
+        const width = container.clientWidth;
+        const height = 300;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+        camera.position.z = 7;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+
+        const pointLight = new THREE.PointLight(0xffffff, 1);
+        pointLight.position.set(5, 5, 5);
+        scene.add(pointLight);
+
+        // Logo Group
+        const logoGroup = new THREE.Group();
+        scene.add(logoGroup);
+
+        let boxMesh, textMesh;
+        let isExporting = false;
+
+        // Create Retro Box (Rounded/Oval shape simulation)
+        function updateLogoGeometry() {
+            if (boxMesh) logoGroup.remove(boxMesh);
+            
+            const boxColor = document.getElementById('color-box').value;
+            const geometry = new THREE.BoxGeometry(3.2, 2.2, 0.4);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: boxColor, 
+                roughness: 0.3, 
+                metalness: 0.2 
+            });
+            boxMesh = new THREE.Mesh(geometry, material);
+            logoGroup.add(boxMesh);
+        }
+
+        // Dummy text representation (using simple block or placeholder shape since font loader requires external json)
+        function updateTextGeometry() {
+            if (textMesh) logoGroup.remove(textMesh);
+            
+            const textColor = document.getElementById('color-text').value;
+            // Simple visual plate for text area
+            const textGeo = new THREE.BoxGeometry(2.6, 0.8, 0.45);
+            const textMat = new THREE.MeshStandardMaterial({ 
+                color: textColor,
+                roughness: 0.2,
+                metalness: 0.5
+            });
+            textMesh = new THREE.Mesh(textGeo, textMat);
+            textMesh.position.z = 0.05;
+            logoGroup.add(textMesh);
+        }
+
+        function updateSceneColors() {
+            const bgColor = document.getElementById('color-bg').value;
+            scene.background = new THREE.Color(bgColor);
+            renderer.setClearColor(scene.background);
+            updateLogoGeometry();
+            updateTextGeometry();
+        }
+
+        // Event Listeners
+        document.getElementById('color-box').addEventListener('input', updateSceneColors);
+        document.getElementById('color-text').addEventListener('input', updateSceneColors);
+        document.getElementById('color-bg').addEventListener('input', updateSceneColors);
+
+        // Initial build
+        updateSceneColors();
+
+        // Animation Loop
+        let angle = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            if (!isExporting) {
+                const speedMultiplier = parseFloat(document.getElementById('speed-select').value);
+                angle += 0.02 * speedMultiplier;
+                logoGroup.rotation.y = angle;
+            }
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // GIF Export logic using gifshot
+        document.getElementById('export-btn').addEventListener('click', () => {
+            if (isExporting) return;
+            isExporting = true;
+
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-text');
+            progressContainer.classList.remove('hidden');
+
+            const frames = [];
+            const totalFrames = 30;
+            let currentFrame = 0;
+
+            logoGroup.rotation.y = 0;
+            
+            function captureFrame() {
+                if (currentFrame < totalFrames) {
+                    logoGroup.rotation.y = (currentFrame / totalFrames) * Math.PI * 2;
+                    renderer.render(scene, camera);
+                    
+                    frames.push(renderer.domElement.toDataURL('image/png'));
+                    currentFrame++;
+                    
+                    const percent = Math.round((currentFrame / totalFrames) * 100);
+                    progressBar.style.width = percent + '%';
+                    progressText.innerText = `正在擷取影格 (${currentFrame}/${totalFrames})`;
+                    
+                    setTimeout(captureFrame, 30);
+                } else {
+                    progressText.innerText = `正在合成 GIF 檔案...`;
+                    
+                    gifshot.createGIF({
+                        images: frames,
+                        interval: 0.05,
+                        numFrames: totalFrames,
+                        width: 300,
+                        height: 200
+                    }, function (obj) {
+                        progressContainer.classList.add('hidden');
+                        isExporting = false;
+                        if (!obj.error) {
+                            const image = obj.image;
+                            const link = document.createElement('a');
+                            link.href = image;
+                            link.download = 'n64_spinning_logo.gif';
+                            link.click();
+                        } else {
+                            alert('GIF 產生成功出錯，請再試一次！');
+                        }
+                    });
+                }
+            }
+
+            captureFrame();
+        });
+    </script>
+</body>
+</html>
