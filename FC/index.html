@@ -1,1 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8-Bit Side-Scrolling Pixel Animation</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Press Start 2P Pixel Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <!-- Tone.js for 8-bit retro Audio synth -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 
+    <style>
+        body {
+            font-family: 'Press Start 2P', monospace;
+            background-color: #0f0d1b;
+            color: #fff;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        /* Enforce crisp pixelated rendering on canvas */
+        canvas {
+            image-rendering: optimizeSpeed;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: -o-crisp-edges;
+            image-rendering: pixelated;
+            -ms-interpolation-mode: nearest-neighbor;
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.2), 0 0 10px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Pixel style CRT scanline effect overlay */
+        .crt::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+            z-index: 10;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        /* Retro Button Styling */
+        .pixel-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #ff0055;
+            color: #ffffff;
+            border: 4px solid #000;
+            box-shadow: inset -4px -4px 0px 0px #990033, inset 4px 4px 0px 0px #ff6699, 4px 4px 0px 0px #000;
+            transition: all 0.1s ease;
+            text-transform: uppercase;
+        }
+
+        .pixel-btn:hover {
+            background-color: #ff2a75;
+            transform: translate(-2px, -2px);
+            box-shadow: inset -4px -4px 0px 0px #990033, inset 4px 4px 0px 0px #ff88b2, 6px 6px 0px 0px #000;
+        }
+
+        .pixel-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: inset -2px -2px 0px 0px #990033, inset 2px 2px 0px 0px #ff6699, 2px 2px 0px 0px #000;
+        }
+
+        .pixel-btn.secondary {
+            background-color: #00ccff;
+            box-shadow: inset -4px -4px 0px 0px #007799, inset 4px 4px 0px 0px #66e0ff, 4px 4px 0px 0px #000;
+            color: #000;
+        }
+        .pixel-btn.secondary:hover {
+            background-color: #33d6ff;
+            box-shadow: inset -4px -4px 0px 0px #007799, inset 4px 4px 0px 0px #99ebff, 6px 6px 0px 0px #000;
+        }
+
+        .pixel-card {
+            background-color: #1a1528;
+            border: 4px solid #3d3456;
+            box-shadow: inset -4px -4px 0px 0px #0d0a14, inset 4px 4px 0px 0px #2a223d, 6px 6px 0px 0px #000;
+        }
+
+        /* Pixel Custom Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 16px;
+            cursor: pointer;
+            background: #2a223d;
+            border: 3px solid #000;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 24px;
+            width: 16px;
+            background: #ffcc00;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -7px;
+            border: 2px solid #000;
+            box-shadow: inset -2px -2px 0 #997a00, inset 2px 2px 0 #ffdb4d;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- Container Header -->
+    <div class="text-center mb-6">
+        <h1 class="text-2xl sm:text-4xl text-yellow-400 mb-2 tracking-wider drop-shadow-[0_4px_0_rgba(0,0,0,1)]">
+            8-BIT RUNNER
+        </h1>
+        <p class="text-xs sm:text-sm text-cyan-400">RETRO SIDE-SCROLLING ANIMATION</p>
+    </div>
+
+    <!-- Main Game Window Container -->
+    <div class="relative max-w-4xl w-full">
+        <!-- Canvas Frame Decorator -->
+        <div class="crt relative rounded-lg border-8 border-gray-900 bg-black overflow-hidden flex justify-center items-center">
+            <canvas id="gameCanvas" width="640" height="360" class="w-full h-auto max-h-[70vh] aspect-[16/9]"></canvas>
+
+            <!-- On-Screen Action Notification -->
+            <div id="toast" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-black px-4 py-2 border-4 border-black text-xs hidden shadow-[4px_4px_0px_0px_#000]">
+                COIN COLLECTED! +100
+            </div>
+        </div>
+
+        <!-- Arcade Control Panel -->
+        <div class="pixel-card mt-6 p-4 sm:p-6 rounded-lg">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+
+                <!-- Primary Action Buttons -->
+                <div class="flex items-center justify-center md:justify-start gap-4">
+                    <button id="playPauseBtn" class="pixel-btn px-4 py-3 text-xs sm:text-sm">
+                        ⏸ PAUSE
+                    </button>
+                    <button id="jumpBtn" class="pixel-btn secondary px-4 py-3 text-xs sm:text-sm">
+                        🦘 JUMP
+                    </button>
+                </div>
+
+                <!-- Speed Control Slider -->
+                <div class="flex flex-col items-center justify-center gap-2">
+                    <div class="flex justify-between w-full text-[10px] sm:text-xs text-purple-300">
+                        <span>SPEED:</span>
+                        <span id="speedValue" class="text-yellow-400">1.0x</span>
+                    </div>
+                    <input type="range" id="speedSlider" min="0.2" max="2.5" step="0.1" value="1.0" class="w-full">
+                </div>
+
+                <!-- Score Board & Audio Toggle -->
+                <div class="flex items-center justify-between md:justify-end gap-4">
+                    <div class="text-right">
+                        <div class="text-[10px] text-gray-400">SCORE</div>
+                        <div id="scoreDisplay" class="text-sm sm:text-base text-green-400">000000</div>
+                    </div>
+                    <button id="soundBtn" class="pixel-btn secondary px-3 py-3 text-xs">
+                        🔊 AUDIO
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer info -->
+    <div class="mt-6 text-[10px] text-gray-500 text-center">
+        USE <span class="text-yellow-400">SPACEBAR</span> OR <span class="text-yellow-400">CLICK</span> TO JUMP | CANVAS 60FPS PARALLAX DEMO
+    </div>
+
+    <!-- Game Logic Script -->
+    <script>
+        // Setup Canvas context
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false; // Keep raw pixelation crisp
+
+        // Game Configuration
+        const V_WIDTH = 320;   // Native internal retro resolution width
+        const V_HEIGHT = 180;  // Native internal retro resolution height
+        
+        let isRunning = true;
+        let speedMultiplier = 1.0;
+        let audioEnabled = false;
+        let score = 0;
+
+        // UI Controls references
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const jumpBtn = document.getElementById('jumpBtn');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
+        const soundBtn = document.getElementById('soundBtn');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const toast = document.getElementById('toast');
+
+        // Retro Synth Setup (Tone.js)
+        let synth = null;
+        function initAudio() {
+            if (!synth) {
+                synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: "square" },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 0.1 }
+                }).toDestination();
+                synth.volume.value = -12;
+            }
+        }
+
+        function playRetroSound(type) {
+            if (!audioEnabled || !synth) return;
+            try {
+                if (type === 'jump') {
+                    synth.triggerAttackRelease("C5", "8n");
+                    setTimeout(() => synth.triggerAttackRelease("G5", "8n"), 50);
+                } else if (type === 'coin') {
+                    synth.triggerAttackRelease("B5", "16n");
+                    setTimeout(() => synth.triggerAttackRelease("E6", "8n"), 60);
+                }
+            } catch(e) {}
+        }
+
+        // 8-Bit Color Palette Constants
+        const PALETTE = {
+            skyDark: '#0b0e26',
+            skyLight: '#1f295d',
+            stars: '#ffffff',
+            mountainsFar: '#2a1a4e',
+            mountainsNear: '#462b66',
+            hills: '#1e4d3b',
+            treeDark: '#0e3323',
+            treeLight: '#1a593e',
+            groundDark: '#542618',
+            groundLight: '#8a4025',
+            grass: '#38b000',
+            grassDark: '#007200',
+            brick: '#993d00',
+            brickLine: '#5c2400',
+            coinYellow: '#ffcc00',
+            coinDark: '#cc9900',
+            heroSkin: '#ffcc99',
+            heroShirt: '#ff0055',
+            heroPants: '#0066ff',
+            heroHair: '#5c3317'
+        };
+
+        // --- Off-Screen Pixel Texture Generators ---
+        // Dynamically creates crisp pixel art sprites to avoid external assets.
+
+        function createPixelTexture(w, h, drawFn) {
+            const offscreen = document.createElement('canvas');
+            offscreen.width = w;
+            offscreen.height = h;
+            const oCtx = offscreen.getContext('2d');
+            oCtx.imageSmoothingEnabled = false;
+            drawFn(oCtx);
+            return offscreen;
+        }
+
+        // Hero Character Frame Generators (8-Bit Pixel Character)
+        const HERO_SIZE = 16;
+        function drawHeroFrame(oCtx, frameIndex) {
+            // Clear
+            oCtx.clearRect(0, 0, HERO_SIZE, HERO_SIZE);
+
+            // Hair/Hat
+            oCtx.fillStyle = PALETTE.heroHair;
+            oCtx.fillRect(4, 1, 8, 3);
+
+            // Head
+            oCtx.fillStyle = PALETTE.heroSkin;
+            oCtx.fillRect(4, 4, 7, 4);
+            // Eye
+            oCtx.fillStyle = '#000000';
+            oCtx.fillRect(9, 5, 1, 2);
+
+            // Body (Shirt)
+            oCtx.fillStyle = PALETTE.heroShirt;
+            oCtx.fillRect(4, 8, 6, 4);
+
+            // Legs Animation Logic (4-frame run cycle)
+            oCtx.fillStyle = PALETTE.heroPants;
+            if (frameIndex === 0) {
+                // Standing / Contact
+                oCtx.fillRect(4, 12, 2, 3);
+                oCtx.fillRect(8, 12, 2, 3);
+                oCtx.fillStyle = '#000';
+                oCtx.fillRect(4, 15, 3, 1);
+                oCtx.fillRect(8, 15, 3, 1);
+            } else if (frameIndex === 1) {
+                // Stride Right
+                oCtx.fillRect(3, 12, 3, 2);
+                oCtx.fillRect(8, 12, 3, 3);
+                oCtx.fillStyle = '#000';
+                oCtx.fillRect(2, 14, 3, 1);
+                oCtx.fillRect(9, 15, 3, 1);
+            } else if (frameIndex === 2) {
+                // Passing
+                oCtx.fillRect(5, 12, 2, 3);
+                oCtx.fillRect(7, 12, 2, 3);
+                oCtx.fillStyle = '#000';
+                oCtx.fillRect(5, 15, 3, 1);
+                oCtx.fillRect(7, 15, 3, 1);
+            } else if (frameIndex === 3) {
+                // Stride Left
+                oCtx.fillRect(7, 12, 3, 2);
+                oCtx.fillRect(4, 12, 3, 3);
+                oCtx.fillStyle = '#000';
+                oCtx.fillRect(8, 14, 3, 1);
+                oCtx.fillRect(3, 15, 3, 1);
+            }
+        }
+
+        const heroFrames = [
+            createPixelTexture(HERO_SIZE, HERO_SIZE, ctx => drawHeroFrame(ctx, 0)),
+            createPixelTexture(HERO_SIZE, HERO_SIZE, ctx => drawHeroFrame(ctx, 1)),
+            createPixelTexture(HERO_SIZE, HERO_SIZE, ctx => drawHeroFrame(ctx, 2)),
+            createPixelTexture(HERO_SIZE, HERO_SIZE, ctx => drawHeroFrame(ctx, 3))
+        ];
+
+        // Coin Texture
+        const coinSprite = createPixelTexture(8, 8, oCtx => {
+            oCtx.fillStyle = PALETTE.coinYellow;
+            oCtx.fillRect(2, 0, 4, 8);
+            oCtx.fillRect(1, 1, 6, 6);
+            oCtx.fillRect(0, 2, 8, 4);
+            oCtx.fillStyle = PALETTE.coinDark;
+            oCtx.fillRect(3, 2, 2, 4);
+        });
+
+        // Brick Tile Texture
+        const brickSprite = createPixelTexture(16, 16, oCtx => {
+            oCtx.fillStyle = PALETTE.brick;
+            oCtx.fillRect(0, 0, 16, 16);
+            oCtx.fillStyle = PALETTE.brickLine;
+            // Horizontal lines
+            oCtx.fillRect(0, 7, 16, 1);
+            oCtx.fillRect(0, 15, 16, 1);
+            // Vertical lines
+            oCtx.fillRect(7, 0, 1, 7);
+            oCtx.fillRect(15, 8, 1, 7);
+        });
+
+        // --- Game State Object ---
+        const state = {
+            cameraX: 0,
+            hero: {
+                x: 40,
+                y: 132, // Grounded level
+                vy: 0,
+                gravity: 0.45,
+                jumpPower: -7.5,
+                isGrounded: true,
+                frame: 0,
+                animTimer: 0
+            },
+            coins: [
+                { x: 180, y: 110, collected: false },
+                { x: 260, y: 90, collected: false },
+                { x: 340, y: 110, collected: false },
+                { x: 480, y: 80, collected: false },
+                { x: 580, y: 105, collected: false }
+            ],
+            particles: [],
+            clouds: [
+                { x: 20, y: 25, speed: 0.1, size: 1 },
+                { x: 150, y: 15, speed: 0.15, size: 1.5 },
+                { x: 280, y: 35, speed: 0.08, size: 0.8 }
+            ]
+        };
+
+        // --- Render Functions for Parallax Layers ---
+
+        function drawSky() {
+            // Gradient Sky
+            const grad = ctx.createLinearGradient(0, 0, 0, V_HEIGHT);
+            grad.addColorStop(0, PALETTE.skyDark);
+            grad.addColorStop(0.7, PALETTE.skyLight);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, V_WIDTH, V_HEIGHT);
+
+            // Retro Pixels Stars
+            ctx.fillStyle = PALETTE.stars;
+            const starCoords = [[15, 10], [90, 40], [160, 20], [230, 12], [290, 45], [70, 70]];
+            starCoords.forEach(([sx, sy]) => {
+                ctx.fillRect((sx - state.cameraX * 0.02) % V_WIDTH, sy, 1, 1);
+            });
+        }
+
+        function drawClouds() {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            state.clouds.forEach(cloud => {
+                let cx = (cloud.x - state.cameraX * cloud.speed) % (V_WIDTH + 60);
+                if (cx < -60) cx += V_WIDTH + 60;
+                
+                // Draw 8-bit cloud shape
+                const w = Math.floor(20 * cloud.size);
+                ctx.fillRect(cx, cloud.y, w, 8);
+                ctx.fillRect(cx + 4, cloud.y - 4, w - 8, 4);
+            });
+        }
+
+        function drawDistantMountains() {
+            ctx.fillStyle = PALETTE.mountainsFar;
+            const parallax = state.cameraX * 0.1;
+            
+            // Draw mountain peaks using low-res polygon lines
+            ctx.beginPath();
+            ctx.moveTo(0, V_HEIGHT - 30);
+            for (let i = 0; i <= V_WIDTH + 40; i += 40) {
+                let worldX = i + (parallax % 40);
+                let height = ((Math.sin(worldX * 0.03) * 20) + (Math.cos(worldX * 0.01) * 15)) + 40;
+                ctx.lineTo(i, V_HEIGHT - height);
+            }
+            ctx.lineTo(V_WIDTH, V_HEIGHT);
+            ctx.lineTo(0, V_HEIGHT);
+            ctx.fill();
+        }
+
+        function drawNearHills() {
+            ctx.fillStyle = PALETTE.mountainsNear;
+            const parallax = state.cameraX * 0.25;
+
+            ctx.beginPath();
+            ctx.moveTo(0, V_HEIGHT - 30);
+            for (let i = 0; i <= V_WIDTH + 30; i += 30) {
+                let worldX = i + (parallax % 30);
+                let height = (Math.sin(worldX * 0.05) * 15) + 30;
+                ctx.lineTo(i, V_HEIGHT - height);
+            }
+            ctx.lineTo(V_WIDTH, V_HEIGHT);
+            ctx.lineTo(0, V_HEIGHT);
+            ctx.fill();
+        }
+
+        function drawTrees() {
+            const parallax = state.cameraX * 0.5;
+            const spacing = 60;
+            const startIdx = Math.floor(parallax / spacing);
+            
+            for (let i = startIdx; i < startIdx + (V_WIDTH / spacing) + 2; i++) {
+                let screenX = Math.floor(i * spacing - parallax);
+                let treeY = V_HEIGHT - 32 - 16;
+
+                // Trunk
+                ctx.fillStyle = PALETTE.groundDark;
+                ctx.fillRect(screenX + 6, treeY + 10, 4, 8);
+
+                // Foliage (Pine Tree Pixel pyramid)
+                ctx.fillStyle = PALETTE.treeDark;
+                ctx.fillRect(screenX + 2, treeY + 6, 12, 4);
+                ctx.fillRect(screenX + 4, treeY + 2, 8, 4);
+                ctx.fillRect(screenX + 6, treeY - 2, 4, 4);
+
+                ctx.fillStyle = PALETTE.treeLight;
+                ctx.fillRect(screenX + 3, treeY + 6, 4, 2);
+                ctx.fillRect(screenX + 5, treeY + 2, 3, 2);
+            }
+        }
+
+        function drawForegroundTilemap() {
+            const parallax = state.cameraX * 1.0;
+            const tileSize = 16;
+            const startTile = Math.floor(parallax / tileSize);
+            const numTiles = Math.ceil(V_WIDTH / tileSize) + 1;
+
+            for (let i = startTile; i < startTile + numTiles; i++) {
+                let screenX = Math.floor(i * tileSize - parallax);
+                let groundY = V_HEIGHT - 32;
+
+                // Grass top layer
+                ctx.fillStyle = PALETTE.grass;
+                ctx.fillRect(screenX, groundY, tileSize, 4);
+                ctx.fillStyle = PALETTE.grassDark;
+                ctx.fillRect(screenX, groundY + 4, tileSize, 2);
+
+                // Dirt underneath
+                ctx.fillStyle = PALETTE.groundLight;
+                ctx.fillRect(screenX, groundY + 6, tileSize, 26);
+
+                // Pixel details on ground
+                ctx.fillStyle = PALETTE.groundDark;
+                if (i % 2 === 0) ctx.fillRect(screenX + 3, groundY + 12, 3, 3);
+                if (i % 3 === 0) ctx.fillRect(screenX + 10, groundY + 18, 4, 2);
+            }
+
+            // Floating Brick Platforms
+            for (let i = startTile; i < startTile + numTiles; i++) {
+                if ((i % 7 === 0 || i % 7 === 1) && i % 14 !== 0) {
+                    let screenX = Math.floor(i * tileSize - parallax);
+                    ctx.drawImage(brickSprite, screenX, V_HEIGHT - 70);
+                }
+            }
+        }
+
+        function drawCoins() {
+            const parallax = state.cameraX * 1.0;
+            const time = Date.now() * 0.005;
+
+            state.coins.forEach(coin => {
+                if (coin.collected) return;
+                
+                let screenX = Math.floor(coin.x - parallax);
+                // Wrap coin positions around for endless running
+                if (screenX < -20) {
+                    coin.x += V_WIDTH + 300;
+                    screenX = Math.floor(coin.x - parallax);
+                }
+
+                if (screenX >= -10 && screenX <= V_WIDTH + 10) {
+                    // Floating bob animation
+                    let bobY = coin.y + Math.sin(time + coin.x) * 3;
+                    ctx.drawImage(coinSprite, screenX, bobY);
+                }
+            });
+        }
+
+        function drawParticles() {
+            const parallax = state.cameraX * 1.0;
+            state.particles.forEach((p, idx) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 0.03;
+
+                if (p.alpha <= 0) {
+                    state.particles.splice(idx, 1);
+                    return;
+                }
+
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.alpha;
+                ctx.fillRect(p.x - parallax, p.y, p.size, p.size);
+                ctx.globalAlpha = 1.0;
+            });
+        }
+
+        function drawHero() {
+            const h = state.hero;
+            const sprite = heroFrames[h.frame];
+            ctx.drawImage(sprite, Math.floor(h.x), Math.floor(h.y));
+        }
+
+        function spawnSparkles(worldX, worldY, color) {
+            for (let i = 0; i < 8; i++) {
+                state.particles.push({
+                    x: worldX,
+                    y: worldY,
+                    vx: (Math.random() - 0.5) * 3,
+                    vy: (Math.random() - 0.5) * 3,
+                    alpha: 1.0,
+                    size: Math.random() > 0.5 ? 2 : 1,
+                    color: color || '#ffcc00'
+                });
+            }
+        }
+
+        // --- Physics & Game Loop ---
+
+        function triggerJump() {
+            if (state.hero.isGrounded) {
+                state.hero.vy = state.hero.jumpPower;
+                state.hero.isGrounded = false;
+                playRetroSound('jump');
+                spawnSparkles(state.cameraX + state.hero.x + 8, state.hero.y + 16, '#ffffff');
+            }
+        }
+
+        function showToast(text) {
+            toast.innerText = text;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 1200);
+        }
+
+        function update() {
+            if (!isRunning) return;
+
+            const baseSpeed = 2.0;
+            const currentSpeed = baseSpeed * speedMultiplier;
+
+            // Advance world camera
+            state.cameraX += currentSpeed;
+
+            // Hero Animation Cycle
+            const h = state.hero;
+            if (h.isGrounded) {
+                h.animTimer += 0.15 * speedMultiplier;
+                h.frame = Math.floor(h.animTimer) % 4;
+            } else {
+                h.frame = 1; // Jumping posture
+            }
+
+            // Hero Physics (Gravity & Jump)
+            h.vy += h.gravity;
+            h.y += h.vy;
+
+            // Platform/Ground Collision Logic
+            const groundLevel = V_HEIGHT - 32 - 16;
+            let currentGround = groundLevel;
+
+            // Check collision with high brick platforms
+            const heroWorldX = state.cameraX + h.x + 8; // Hero center X
+            const tileUnderHero = Math.floor(heroWorldX / 16);
+            if ((tileUnderHero % 7 === 0 || tileUnderHero % 7 === 1) && tileUnderHero % 14 !== 0) {
+                const brickY = V_HEIGHT - 70 - 16;
+                // If landing from top
+                if (h.y <= brickY + 6 && h.vy >= 0) {
+                    currentGround = brickY;
+                }
+            }
+
+            // Snap to ground
+            if (h.y >= currentGround) {
+                h.y = currentGround;
+                h.vy = 0;
+                h.isGrounded = true;
+            }
+
+            // Coin Collision Detection
+            state.coins.forEach(coin => {
+                if (coin.collected) return;
+
+                const coinScreenX = coin.x - state.cameraX;
+                const dist = Math.hypot(h.x + 8 - (coinScreenX + 4), h.y + 8 - (coin.y + 4));
+
+                if (dist < 12) {
+                    coin.collected = true;
+                    score += 100;
+                    scoreDisplay.innerText = String(score).padStart(6, '0');
+                    playRetroSound('coin');
+                    spawnSparkles(coin.x + 4, coin.y + 4, '#ffcc00');
+                    showToast("COIN COLLECTED! +100");
+                }
+            });
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, V_WIDTH, V_HEIGHT);
+
+            // Draw Background to Foreground Layers
+            drawSky();
+            drawClouds();
+            drawDistantMountains();
+            drawNearHills();
+            drawTrees();
+            drawForegroundTilemap();
+            drawCoins();
+            drawParticles();
+            drawHero();
+        }
+
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- Event Listeners & UI Handling ---
+
+        playPauseBtn.addEventListener('click', () => {
+            isRunning = !isRunning;
+            playPauseBtn.innerText = isRunning ? "⏸ PAUSE" : "▶ PLAY";
+        });
+
+        jumpBtn.addEventListener('click', () => {
+            initAudio();
+            triggerJump();
+        });
+
+        canvas.addEventListener('pointerdown', () => {
+            initAudio();
+            triggerJump();
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'ArrowUp') {
+                e.preventDefault();
+                initAudio();
+                triggerJump();
+            }
+        });
+
+        speedSlider.addEventListener('input', (e) => {
+            speedMultiplier = parseFloat(e.target.value);
+            speedValue.innerText = speedMultiplier.toFixed(1) + 'x';
+        });
+
+        soundBtn.addEventListener('click', () => {
+            initAudio();
+            if (Tone.context.state !== 'running') {
+                Tone.start();
+            }
+            audioEnabled = !audioEnabled;
+            soundBtn.innerText = audioEnabled ? "🔊 AUDIO" : "🔇 MUTED";
+            soundBtn.classList.toggle('secondary', !audioEnabled);
+        });
+
+        // Start 60fps Loop on Window Load
+        window.onload = function() {
+            gameLoop();
+        };
+    </script>
+</body>
+</html>
